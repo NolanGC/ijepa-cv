@@ -383,7 +383,12 @@ def main(args, resume_preempt=False):
             next(momentum_scheduler)
             mask_collator.step()
 
-    def save_checkpoint(epoch):
+    def save_checkpoint(epoch, batch=None):
+        checkpoint_name = f'epoch{epoch}'
+        if batch is not None:
+            checkpoint_name += f'_batch{batch}'
+        save_path_batch = os.path.join(folder, f'{tag}-{checkpoint_name}.pth.tar')
+
         save_dict = {
             'encoder': encoder.state_dict(),
             'predictor': predictor.state_dict(),
@@ -391,15 +396,16 @@ def main(args, resume_preempt=False):
             'opt': optimizer.state_dict(),
             'scaler': None if scaler is None else scaler.state_dict(),
             'epoch': epoch,
+            'batch': batch, # added
             'loss': loss_meter.avg,
             'batch_size': batch_size,
             'world_size': world_size,
             'lr': lr
         }
         if rank == 0:
-            torch.save(save_dict, latest_path)
-            if (epoch + 1) % checkpoint_freq == 0:
-                torch.save(save_dict, save_path.format(epoch=f'{epoch + 1}'))
+            torch.save(save_dict, save_path_batch)
+            if batch is None:  # also save latest checkpoint at end of epoch
+                torch.save(save_dict, latest_path)
 
     # -- TRAINING LOOP
     for epoch in range(start_epoch, num_epochs):
@@ -508,8 +514,13 @@ def main(args, resume_preempt=False):
 
             assert not np.isnan(loss), 'loss is nan'
 
+            # added
+            logger.info('avg. loss at batch %d, epoch %d: %.3f' % (itr, epoch+1, loss_meter.avg))
+            if itr % 1000 == 0 and itr > 0:
+                save_checkpoint(epoch+1, batch=itr)
+
         # -- Save Checkpoint after every epoch
-        logger.info('avg. loss %.3f' % loss_meter.avg)
+        logger.info('avg. loss at end of epoch %d: %.3f' % (epoch+1, loss_meter.avg)) # changed
         save_checkpoint(epoch+1)
 
 

@@ -14,7 +14,7 @@ import yaml
 
 import submitit
 
-from src.train import main as app_main
+from src.train_geo import main as app_main
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger()
@@ -77,8 +77,8 @@ def launch():
         folder=os.path.join(args.folder, 'job_%j'),
         slurm_max_num_timeout=20)
     executor.update_parameters(
+        slurm_gres="gpu:4",
         slurm_partition=args.partition,
-        slurm_mem_per_gpu='55G',
         timeout_min=args.time,
         nodes=args.nodes,
         tasks_per_node=args.tasks_per_node,
